@@ -122,3 +122,9 @@ dmypy.json
 
 # Pyre type checker
 .pyre/
+
+# Scrapy
+**/*.pyc
+config/secrets*.py
+config/settings_*.py
+data/*
