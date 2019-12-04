@@ -125,6 +125,7 @@ dmypy.json
 
 # Scrapy
 **/*.pyc
-config/secrets*.py
-config/settings_*.py
+settings_*.py
+bankcrawler/data/*
+bankcrawler/settings.py
 data/*
