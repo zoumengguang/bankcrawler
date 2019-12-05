@@ -5,8 +5,7 @@
 # See documentation in:
 # https://docs.scrapy.org/en/latest/topics/spider-middleware.html
 
-from scrapy import signals
-
+from scrapy import signals, Request
 
 class BankcrawlerSpiderMiddleware(object):
     # Not all methods need to be defined. If a method is not defined,
@@ -101,3 +100,21 @@ class BankcrawlerDownloaderMiddleware(object):
 
     def spider_opened(self, spider):
         spider.logger.info('Spider opened: %s' % spider.name)
+
+# Spider middleware for tracking original start_url of request
+# Source: https://stackoverflow.com/questions/47289863/scrapy-get-pre-redirect-url
+class StartRequestsMiddleware(object):
+    start_urls = {}
+
+    def process_start_requests(self, start_requests, spider):
+        for i, request in enumerate(start_requests):
+            request.meta.update(start_url=request.url)
+            yield request
+
+    def process_spider_output(self, response, result, spider):
+        for output in result:
+            if isinstance(output, Request):
+                output.meta.update(
+                    start_url=response.meta['start_url'],
+                )
+            yield output
