@@ -4,16 +4,16 @@ import scrapy
 import os
 import csv
 import re
-import pprint
+""" import pprint """
 from urlparse import urlparse
 
 LOCAL_DATA_PATH = os.getenv('LOCAL_DATA_PATH')
+visited = {}
 bankDict = {}
 bankUrls = []
 bankDomains = []
 
-
-pp = pprint.PrettyPrinter(indent=4)
+""" pp = pprint.PrettyPrinter(indent=4) """
 
 # Parse .csv and populate dict/lists
 reader = csv.DictReader(open(LOCAL_DATA_PATH))
@@ -28,19 +28,19 @@ for row in reader:
         "Bank URL": bankUrl,
         "IDRSSD": values[1],
         "Bank Name": values[2],
-        "ABA Routing Number": values[4]
+        "ABA Routing Number": values[4],
     }
     bankUrls.append(bankUrl)
     bankDomains.append(bankDomain)
-    """ pp.pprint(bankDict[bankDomain]) """
-
 
 class LinksSpider(scrapy.Spider):
     name = 'links'
-    allowed_domains = ['unitedbank.com']
-    start_urls = ['http://www.unitedbank.com']
-    """     allowed_domains = bankDomains
-    start_urls = bankUrls """
+    """ allowed_domains = ['unitedbank.com']
+    start_urls = ['http://www.unitedbank.com'] """
+    allowed_domains = bankDomains
+    start_urls = bankUrls
+
+    # handle_httpstatus_list = [400, 404, 500]
 
     # print(response.request) Response type (GET, POST) and url
     # print(response.status) HTTP status code
@@ -52,16 +52,20 @@ class LinksSpider(scrapy.Spider):
                 curDomain = urlparse(href).netloc
                 curPath = urlparse(href).path
                 if curDomain:
-                    curUrlOrgStart = response.meta['start_url'].replace(
-                        'http://', '').replace('https://', '').replace('/', '')
-                    curBankInfo = bankDict[curUrlOrgStart]
-                    linkType = 'Internal' if curDomain in curUrlOrgStart else 'External'
-                    yield {
-                        'FDIC Cert': curBankInfo['FDIC Cert'],
-                        'Bank Domain': curUrlOrgStart,
-                        'Link Type': linkType,
-                        'Link Domain': curDomain,
-                        'Link Path': curPath,
-                        'Link Status Response': response.status
-                    }
+                    if curDomain not in visited.keys(): 
+                        visited[curDomain] = set()
+                    if curPath not in visited[curDomain]:
+                        curUrlOrgStart = response.meta['start_url'].replace(
+                            'http://', '').replace('https://', '').replace('/', '')
+                        curBankID = bankDict[curUrlOrgStart]['FDIC Cert']
+                        linkType = 'Internal' if curDomain in curUrlOrgStart else 'External'
+                        visited[curDomain].add(curPath)
+                        yield {
+                            'FDIC Cert': curBankID,
+                            'Bank Domain': curUrlOrgStart,
+                            'Link Type': linkType,
+                            'Link Domain': curDomain,
+                            'Link Path': curPath,
+                            'Link Status Response': response.status
+                        }
             yield scrapy.Request(response.urljoin(href), self.parse)

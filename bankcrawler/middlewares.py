@@ -118,3 +118,4 @@ class StartRequestsMiddleware(object):
                     start_url=response.meta['start_url'],
                 )
             yield output
+            
