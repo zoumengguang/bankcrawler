@@ -4,18 +4,18 @@ import scrapy
 import os
 import csv
 import re
-from urlparse import urlparse
+import urllib.parse
 
-LOCAL_DATA_PATH = os.getenv('LOCAL_DATA_PATH')
+dataFile = os.environ['LOCAL_DATA_PATH']
 visited = {}
 bankDict = {}
 bankUrls = []
 bankDomains = []
 
 # Parse .csv and populate dict/lists
-reader = csv.DictReader(open(LOCAL_DATA_PATH))
+reader = csv.DictReader(open(dataFile))
 for row in reader:
-    values = row.values()
+    values = list(row.values())
     bankDomain = values[0].replace(
         'http://', '').replace('https://', '').replace('/', '')
     bankUrl = 'http://' + \
@@ -47,7 +47,7 @@ class LinksSpider(scrapy.Spider):
         if response.status in range (400, 600):
             curDomain = urlparse(response.url).netloc
             curPath = urlparse(response.url).path
-            linkType = 'Internal' if curDomain in curUrlOrgStart else 'External'
+            linkType = 'Internal' if curUrlOrgStart in curDomain else 'External'
             yield {
                 'FDIC Cert': curBankID,
                 'Bank Domain': curUrlOrgStart,
