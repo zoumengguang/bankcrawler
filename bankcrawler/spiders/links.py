@@ -4,9 +4,10 @@ import scrapy
 import os
 import csv
 import re
-from urlparse import urlparse
+from urllib.parse import urlparse
 
-LOCAL_DATA_PATH = os.getenv('LOCAL_DATA_PATH')
+""" dataFile = os.environ['LOCAL_DATA_PATH'] """
+dataFile = './data/banklist1.csv'
 visited = {}
 bankDict = {}
 bankUrls = []
@@ -35,6 +36,9 @@ class LinksSpider(scrapy.Spider):
     allowed_domains = bankDomains
     start_urls = bankUrls
     handle_httpstatus_list = [400, 404, 500]
+    custom_settings = {
+        'FEED_EXPORT_FIELDS': ["FDIC Cert", "Bank Domain", "Link Type", "Link Domain", "Link Path", "Link Status Response"]
+    }
 
     # print(response.request) Response type (GET, POST) and url
     # print(response.status) HTTP status code
