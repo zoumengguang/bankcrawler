@@ -14,9 +14,9 @@ bankUrls = []
 bankDomains = []
 
 # Parse .csv and populate dict/lists
-reader = csv.DictReader(open(LOCAL_DATA_PATH))
+reader = csv.DictReader(open(dataFile))
 for row in reader:
-    values = row.values()
+    values = list(row.values())
     bankDomain = values[0].replace(
         'http://', '').replace('https://', '').replace('/', '')
     bankUrl = 'http://' + \

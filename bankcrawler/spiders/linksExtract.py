@@ -7,9 +7,6 @@ import re
 from urllib.parse import urlparse
 from scrapy_splash import SplashRequest
 from bs4 import BeautifulSoup
-import pprint
-
-pp = pprint.PrettyPrinter(indent=3)
 
 """ dataFile = os.environ['LOCAL_DATA_PATH'] """
 dataFile = './data/productionBankList.csv'
@@ -41,50 +38,70 @@ class LinksSpider(scrapy.Spider):
     name = 'linksExtract'
     allowed_domains = bankDomains
     start_urls = bankUrls
+    custom_settings = {'DEPTH_LIMIT': 4}
 
-    custom_settings = {
-        'DEPTH_LIMIT': 3
-    }
-
-    # Override default start_requests func to force use of Splash
+    # Override default start_requests func to force use of Splash w/ each request
     def start_requests(self):
         for url in self.start_urls:
             yield SplashRequest(url, self.parse, endpoint='render.html', args={'wait': 0.5})
 
+    # parse receives response obj containing both raw HTML from Splash and regular response content
+    # loops through both response.body with raw HTML and response itself using xpath to access elements
+    # Treat each invocation of parse as a singular page with links returned as a response obj
     def parse(self, response):
-        """ # Get cur response start_url to access bankDict for comparing
-        linkList = []
-        for href in response.xpath('//a/@href').getall():
-            if href.startswith('http'):
-                linkList.append(href)
-        pp.pprint(linkList) """
-        curUrlDomain = response.meta['start_url'].lower().replace(
+        curUrlStartDom = response.meta['start_url'].lower().replace(
             'http://', '').replace('https://', '').replace('/', '').replace('www.','')
-        # Use BeautifulSoup parser to get links from raw HTML returned from Scrapy Splash
-        soup = BeautifulSoup(response.body)
-        for link in soup.findAll('a', attrs={'href': re.compile("^https?://")}):
+        soup = BeautifulSoup(response.body, features='lxml')
+        curResponseDom = urlparse(response.url).netloc
+        curResponsePath = urlparse(response.url).path
+        # Search HTML response body from JS content with Splash + parse with BeautifulSoup
+        for link in soup.find_all('a', attrs={'href': re.compile("^https?://")}):
             href = link.get('href')
             curDomain = urlparse(href).netloc.replace('www.','')
             curPath = urlparse(href).path.rstrip('/')
-            if not curPath:
-                curPath = '/'
             if curDomain:
                 if curDomain not in visited:
                     visited[curDomain] = set()
                 if curPath not in visited[curDomain]:
                     visited[curDomain].add(curPath)
-                    if bankDict[curUrlDomain]['Alpha Link'] in href:
+                    if bankDict[curUrlStartDom]['Alpha Link'] in href:
                         yield {
-                            'Bank Name': bankDict[curUrlDomain]['Bank Name'],
-                            'Response Domain': urlparse(response.url).netloc,
-                            'Response Path': urlparse(response.url).path,
-                            'Link Type': bankDict[curUrlDomain]['Alpha Link']
+                            'Bank Name': bankDict[curUrlStartDom]['Bank Name'],
+                            'Response Domain': curResponseDom,
+                            'Response Path': curResponsePath,
+                            'Prod/Alpha Link': bankDict[curUrlStartDom]['Alpha Link']
                         }
-                    elif bankDict[curUrlDomain]['Prod Link'] in href:
+                    elif bankDict[curUrlStartDom]['Prod Link'] in href:
                         yield {
-                            'Bank Name': bankDict[curUrlDomain]['Bank Name'],
-                            'Response Domain': urlparse(response.url).netloc,
-                            'Response Path': urlparse(response.url).path,
-                            'Link Type': bankDict[curUrlDomain]['Prod Link']
+                            'Bank Name': bankDict[curUrlStartDom]['Bank Name'],
+                            'Response Domain': curResponseDom,
+                            'Response Path': curResponsePath,
+                            'Prod/Alpha Link': bankDict[curUrlStartDom]['Prod Link']
                         }
+        # Search response directly with xpath
+        # Only create new requests from xpath vars b/c Splash raw HTML doesn't
+        # get all the hrefs on site (unknown reason)
+        for href in response.xpath('//a/@href').getall():
+            if href.startswith('http'):
+                curDomain = urlparse(href).netloc.replace('www.','')
+                curPath = urlparse(href).path.rstrip('/')
+                if curDomain:
+                    if curDomain not in visited:
+                        visited[curDomain] = set()
+                    if curPath not in visited[curDomain]:
+                        visited[curDomain].add(curPath)
+                        if bankDict[curUrlStartDom]['Alpha Link'] in href:
+                            yield {
+                                'Bank Name': bankDict[curUrlStartDom]['Bank Name'],
+                                'Response Domain': curResponseDom,
+                                'Response Path': curResponsePath,
+                                'Prod/Alpha Link': bankDict[curUrlStartDom]['Alpha Link']
+                            }
+                        elif bankDict[curUrlStartDom]['Prod Link'] in href:
+                            yield {
+                                'Bank Name': bankDict[curUrlStartDom]['Bank Name'],
+                                'Response Domain': curResponseDom,
+                                'Response Path': curResponsePath,
+                                'Prod/Alpha Link': bankDict[curUrlStartDom]['Prod Link']
+                            }
             yield scrapy.Request(response.urljoin(href), self.parse)
