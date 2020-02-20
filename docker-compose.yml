@@ -1,0 +1,33 @@
+version: '3'
+
+services:
+  bankcrawler:
+    image: mkjinzou/bankcrawler
+    build: .
+    volumes:
+      - .:/usr/src/app
+    environment:
+      SPLASH_URL: "http://splash:8050"
+    links:
+      - splash
+    networks: 
+      - primary
+    ports:
+      - 6800:6800
+    depends_on:
+      - splash
+  splash:
+    image: scrapinghub/splash
+    ports:
+      - 8050:8050
+      - 5023:5023
+    networks: 
+      - primary
+    expose:
+      - 8050
+      - 5023
+
+networks:
+  primary:
+    driver: "bridge"
+  
