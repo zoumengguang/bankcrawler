@@ -37,6 +37,9 @@ you can run `scrapy crawl [SPIDER_NAME] -o [OUTPUT_FILE_NAME].[FILE_EXTENSION]`
 
 For more detailed usage, please refer to the [Scrapy documentation](https://docs.scrapy.org/en/latest/index.html).
 
+## Troubleshooting
+- If your log has messages that say "Connection refused", you most likely do not have the Splash server running on a spider that utlizes SplashRequests. To do so, install Docker if you haven't already, and run `docker run -p 8050:8050 scrapinghub/splash`.
+
 ## Required Modules and Dependencies
 - Python 3.6+
 - Scrapy 1.8+
