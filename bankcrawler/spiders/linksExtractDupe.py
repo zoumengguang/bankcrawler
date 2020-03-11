@@ -4,12 +4,17 @@ import scrapy
 import os
 import csv
 import re
+from os.path import join, dirname
+from dotenv import load_dotenv
 from urllib.parse import urlparse
 from scrapy_splash import SplashRequest
 from bs4 import BeautifulSoup
 
-""" dataFile = os.environ['LOCAL_DATA_PATH'] """
-dataFile = './data/productionBankList.csv'
+dotenv_path = join(dirname(__file__), '../.env')
+load_dotenv(dotenv_path)
+
+dataFile = os.environ['LOCAL_DATA_PATH']
+#dataFile = './data/productionBankList.csv'
 visited = {}
 visited2 = {}
 bankDict = {}

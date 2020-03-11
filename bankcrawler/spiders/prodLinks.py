@@ -8,10 +8,20 @@ import scrapy
 import os
 import csv
 import re
+import tldextract
+from os.path import join, dirname
+from dotenv import load_dotenv
 from urllib.parse import urlparse
+from scrapy_splash import SplashRequest
+from bs4 import BeautifulSoup
 import pprint
 
-""" dataFile = os.environ['LOCAL_DATA_PATH'] """
+pp = pprint.PrettyPrinter(indent=3)
+
+dotenv_path = join(dirname(__file__), '../.env')
+load_dotenv(dotenv_path)
+
+#dataFile = os.environ['LOCAL_DATA_PATH']
 dataFile = './data/productionBankList.csv'
 visited = {}
 bankDict = {}
@@ -27,29 +37,55 @@ bankDomains = []
 reader = csv.DictReader(open(dataFile))
 for row in reader:
     values = list(row.values())
-    bankDomain = values[0].replace(
-        'http://', '').replace('https://', '').replace('/', '')
+    bankDomain = values[3].lower().replace(
+        'http://', '').replace('https://', '').replace('/', '').replace('www.','')
     bankUrl = 'http://' + \
-        values[0] if not re.search('^https?://', values[0]) else values[0]
+        values[3].lower() if not re.search('^https?://', values[3].lower()) else values[3].lower()
+    alphaLink = values[4].lower().replace(
+        'http://', '').replace('https://', '').replace('/', '').replace('www.','')
+    prodLink = values[5].lower().replace(
+        'http://', '').replace('https://', '').replace('/', '').replace('www.','')
     bankDict[bankDomain] = {
-        "Bank Name": values[4],
+        "Bank Name": values[1],
         "Bank URL": bankUrl.rstrip('/'),
-        "Alpha Link": values[2].rstrip('/').replace('http://', '').replace('https://', ''),
-        "Prod Link": values[3].rstrip('/').replace('http://', '').replace('https://', ''),
+        "Alpha Link": alphaLink,
+        "Prod Link": prodLink,
     }
-    bankUrls.append(bankUrl)
-    bankDomains.append(bankDomain)
+    if bankUrl: bankUrls.append(bankUrl)
+    if bankDomain: bankDomains.append(bankDomain)
+    bankDomains.append(alphaLink)
+    bankDomains.append(prodLink)
 
-pp = pprint.PrettyPrinter(indent=3)
 #pp.pprint(bankDict)
+#pp.pprint(bankUrls)
+#pp.pprint(bankDomains)
 
 class ProdLinksSpider(scrapy.Spider):
     name = 'prodLinks'
-    # allowed_domains = bankDomains
+    allowed_domains = bankDomains
     start_urls = bankUrls
     custom_settings = {
-        'FEED_EXPORT_FIELDS': ["Bank Name", "Bank Domain", "Link Domain", "Link Path", "Link Type"]
+        #'FEED_EXPORT_FIELDS': ["Bank Name", "Bank Domain", "Link Domain", "Link Path", "Link Type"]
+        'FEED_FORMAT': 'csv',
+        'FEED_URI': './csv/{}.csv'.format(name),
+        'FEED_EXPORT_ENCODING': 'utf-8',
+        'DEPTH_LIMIT': 3,
+        'LOG_ENABLED': False,
+        'LOG_LEVEL': 'INFO'
     }
+
+    def start_requests(self):
+        for url in self.start_urls:
+            yield scrapy.Request(url, self.parse, meta={
+                'splash': {
+                    'args': {
+                        'timeout': 90, 
+                        'wait': 0.5,
+                        'resource_timeout': 60 
+                    },
+                    'endpoint': 'render.html'
+                }
+            })
 
     # print(response.request) Response type (GET, POST) and url
     # print(response.status) HTTP status code
@@ -57,33 +93,47 @@ class ProdLinksSpider(scrapy.Spider):
     # print(response.meta['start_url']) custom middleware to get originating start_url of current url
     def parse(self, response):
         # Get originating domain of current request
-        curUrlDomain = response.meta['start_url'].replace(
-            'http://', '').replace('https://', '').replace('/', '')
+        curBankDomain = response.meta['start_url'].lower().replace(
+            'http://', '').replace('https://', '').replace('/', '').replace('www.','')
+        extracted = tldextract.extract(response.url.lower())
+        curResponseDom = "{}.{}".format(extracted.domain, extracted.suffix)
+        if (extracted.subdomain): curResponseDom = extracted.subdomain + '.' + curResponseDom
+        curResponsePath = urlparse(response.url).path.rstrip('/')
+        soup = BeautifulSoup(response.body, features='lxml')
+
         # Get all links on page with HTTP/S
+        for link in soup.findAll('a', attrs={'href': re.compile("^https?://")}):
+            href = link.get('href').lower()
+            """ if curDomain not in visited:
+                visited[curDomain] = set()
+            if curPath not in visited[curDomain]:
+                visited[curDomain].add(curPath)"""
+
+            if bankDict[curBankDomain]['Alpha Link'] in href:
+                yield {
+                    'Bank Name': bankDict[curBankDomain]['Bank Name'],
+                    'Bank Domain': curBankDomain,
+                    'Found Link Domain': curResponseDom,
+                    'Found Link Path': curResponsePath,
+                    'Link(Alpha/Prod)': bankDict[curBankDomain]['Alpha Link']
+                }
+            elif bankDict[curBankDomain]['Prod Link'] in href:
+                yield {
+                    'Bank Name': bankDict[curBankDomain]['Bank Name'],
+                    'Bank Domain': curBankDomain,
+                    'Found Link Domain': curResponseDom,
+                    'Found Link Path': curResponsePath,
+                    'Link(Alpha/Prod)': bankDict[curBankDomain]['Prod Link']
+                }
+
         for href in response.xpath('//a/@href').getall():
-            if href.startswith('http'):
-                hrefTrim = href.rstrip('/')
-                curHrefDomain = urlparse(hrefTrim).netloc
-                curPath = urlparse(hrefTrim).path
-                if curHrefDomain:
-                    if curHrefDomain not in visited:
-                        visited[curHrefDomain] = set()
-                    if curPath not in visited[curHrefDomain]:
-                        visited[curHrefDomain].add(curPath)                       
-                        if bankDict[curUrlDomain]['Alpha Link'] in href:
-                            yield {
-                                'Bank Name': bankDict[curUrlDomain]['Bank Name'],
-                                'Bank Domain': curUrlDomain,
-                                'Link Domain': curHrefDomain,
-                                'Link Path': curPath,
-                                'Link Type': 'Alpha'
-                            }
-                        elif bankDict[curUrlDomain]['Prod Link'] in href:
-                            yield {
-                                'Bank Name': bankDict[curUrlDomain]['Bank Name'],
-                                'Bank Domain': curUrlDomain,
-                                'Link Domain': curHrefDomain,
-                                'Link Path': curPath,
-                                'Link Type': 'Production'
-                            }
-            yield scrapy.Request(response.urljoin(href), self.parse)
+            yield scrapy.Request(response.urljoin(href), self.parse, meta={
+                'splash': {
+                    'args': {
+                        'timeout': 90, 
+                        'wait': 0.5,
+                        'resource_timeout': 60 
+                    },
+                    'endpoint': 'render.html'
+                }
+            })

@@ -4,9 +4,10 @@ import csv
 import re
 from urllib.parse import urlparse
 
-""" dataFile = os.environ['LOCAL_DATA_PATH'] """
-dataFile = './data/productionBankList.csv'
-bankFile = './data/bankSheet.csv'
+dataFile = os.environ['LOCAL_DATA_PATH']
+bankFile = os.environ['LOCAL_SHEET_PATH']
+#dataFile = './data/productionBankList.csv'
+#bankFile = './data/bankSheet.csv'
 visited = {}
 dataDict = {}
 bankSheetDict = {}

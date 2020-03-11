@@ -4,12 +4,21 @@ import scrapy
 import os
 import csv
 import re
+from os.path import join, dirname
+from dotenv import load_dotenv
 from urllib.parse import urlparse
 from scrapy_splash import SplashRequest
 from bs4 import BeautifulSoup
 
-""" dataFile = os.environ['LOCAL_DATA_PATH'] """
-dataFile = './data/productionBankListShort.csv'
+dotenv_path = join(dirname(__file__), '../.env')
+load_dotenv(dotenv_path)
+
+#Local testing use only, logs should be stored inside S3
+#if 'linksExtract.csv' in os.listdir('./csv'): os.remove('./csv/linksExtract.csv')
+#if 'linksExtract.log' in os.listdir('./logs'): os.remove('./logs/linksExtract.log')
+
+dataFile = os.environ['LOCAL_DATA_PATH']
+#dataFile = './data/productionBankListShort.csv'
 visited = {}
 bankDict = {}
 bankUrls = []
@@ -39,10 +48,10 @@ class LinksSpider(scrapy.Spider):
     allowed_domains = bankDomains
     start_urls = bankUrls
     custom_settings = {
-        'LOG_FILE': './logs/linksExtract.log',
-        'LOG_LEVEL': 'DEBUG',
-        'FEED_FORMAT': 'csv',
-        'FEED_URI': './csv/linksExtract.csv',
+        #'LOG_FILE': './logs/linksExtract.log',
+        #'LOG_LEVEL': 'DEBUG',
+        #'FEED_FORMAT': 'csv',
+        #'FEED_URI': './csv/linksExtract.csv',
         'DEPTH_LIMIT': 4
     }
 
