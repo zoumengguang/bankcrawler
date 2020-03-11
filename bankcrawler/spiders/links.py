@@ -11,39 +11,39 @@ from urllib.parse import urlparse
 dotenv_path = join(dirname(__file__), '../.env')
 load_dotenv(dotenv_path)
 
-#dataFile = './data/banklist1.csv'
-dataFile = os.environ['LOCAL_DATA_PATH']
-visited = {}
-bankDict = {}
-bankUrls = []
-bankDomains = []
-
-# Parse .csv and populate dict/lists
-reader = csv.DictReader(open(dataFile))
-for row in reader:
-    values = list(row.values())
-    bankDomain = values[0].replace(
-        'http://', '').replace('https://', '').replace('/', '')
-    bankUrl = 'http://' + \
-        values[0] if not re.search('^https?://', values[0]) else values[0]
-    bankDict[bankDomain] = {
-        "FDIC Cert": values[3],
-        "Bank URL": bankUrl,
-        "IDRSSD": values[1],
-        "Bank Name": values[2],
-        "ABA Routing Number": values[4],
-    }
-    bankUrls.append(bankUrl)
-    bankDomains.append(bankDomain)
-
 class LinksSpider(scrapy.Spider):
     name = 'links'
-    allowed_domains = bankDomains
-    start_urls = bankUrls
     handle_httpstatus_list = [400, 404, 500]
     custom_settings = {
         'FEED_EXPORT_FIELDS': ["FDIC Cert", "Bank Domain", "Link Type", "Link Domain", "Link Path", "Link Status Response"]
     }
+
+    dataFile = os.environ['LOCAL_DATA_PATH']
+    visited = {}
+    bankDict = {}
+    bankUrls = []
+    bankDomains = []
+
+    # Parse .csv and populate dict/lists
+    reader = csv.DictReader(open(dataFile))
+    for row in reader:
+        values = list(row.values())
+        bankDomain = values[0].replace(
+            'http://', '').replace('https://', '').replace('/', '')
+        bankUrl = 'http://' + \
+            values[0] if not re.search('^https?://', values[0]) else values[0]
+        bankDict[bankDomain] = {
+            "FDIC Cert": values[3],
+            "Bank URL": bankUrl,
+            "IDRSSD": values[1],
+            "Bank Name": values[2],
+            "ABA Routing Number": values[4],
+        }
+        bankUrls.append(bankUrl)
+        bankDomains.append(bankDomain)
+    
+    allowed_domains = bankDomains
+    start_urls = bankUrls
 
     # print(response.request) Response type (GET, POST) and url
     # print(response.status) HTTP status code
@@ -52,7 +52,7 @@ class LinksSpider(scrapy.Spider):
     def parse(self, response):
         curUrlOrgStart = response.meta['start_url'].replace(
             'http://', '').replace('https://', '').replace('/', '')
-        curBankID = bankDict[curUrlOrgStart]['FDIC Cert']
+        curBankID = self.bankDict[curUrlOrgStart]['FDIC Cert']
         if response.status in range (400, 600):
             curDomain = urlparse(response.url).netloc
             curPath = urlparse(response.url).path
@@ -71,11 +71,11 @@ class LinksSpider(scrapy.Spider):
                     curDomain = urlparse(href).netloc
                     curPath = urlparse(href).path
                     if curDomain:
-                        if curDomain not in visited.keys(): 
-                            visited[curDomain] = set()
-                        if curPath not in visited[curDomain]:
+                        if curDomain not in self.visited.keys(): 
+                            self.visited[curDomain] = set()
+                        if curPath not in self.visited[curDomain]:
                             linkType = 'Internal' if curUrlOrgStart in curDomain else 'External'
-                            visited[curDomain].add(curPath)
+                            self.visited[curDomain].add(curPath)
                             if response.status in range(100, 600):
                                 yield {
                                     'FDIC Cert': curBankID,

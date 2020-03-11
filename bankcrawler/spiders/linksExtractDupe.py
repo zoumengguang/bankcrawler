@@ -13,42 +13,42 @@ from bs4 import BeautifulSoup
 dotenv_path = join(dirname(__file__), '../.env')
 load_dotenv(dotenv_path)
 
-dataFile = os.environ['LOCAL_DATA_PATH']
-#dataFile = './data/productionBankList.csv'
-visited = {}
-visited2 = {}
-bankDict = {}
-bankUrls = []
-bankDomains = []
-
-# Parse input .csv and populate dict/lists
-reader = csv.DictReader(open(dataFile))
-for row in reader:
-    values = list(row.values())
-    bankDomain = values[3].lower().replace(
-        'http://', '').replace('https://', '').replace('/', '').replace('www.','')
-    bankUrl = 'http://' + \
-        values[3].lower() if not re.search('^https?://', values[3].lower()) else values[3].lower()
-    bankDict[bankDomain] = {
-        "Bank Name": values[1],
-        "Bank URL": bankUrl.rstrip('/'),
-        "Alpha Link": values[4].rstrip('/').replace('http://', '').replace('https://', ''),
-        "Prod Link": values[5].rstrip('/').replace('http://', '').replace('https://', ''),
-    }
-    bankUrls.append(bankUrl)
-    bankDomains.append(bankDomain)
-    bankDomains.append(urlparse(values[4]).netloc)
-    bankDomains.append(urlparse(values[5]).netloc)
-
 class LinksSpider(scrapy.Spider):
     name = 'linksExtractDupe'
-    allowed_domains = bankDomains
-    start_urls = bankUrls
     custom_settings = {
         'LOG_FILE': 'logs/linksExtractDupe.log',
         'LOG_LEVEL': 'DEBUG',
         'DEPTH_LIMIT': 4
     }
+
+    dataFile = os.environ['LOCAL_DATA_PATH']
+    visited = {}
+    visited2 = {}
+    bankDict = {}
+    bankUrls = []
+    bankDomains = []
+
+    # Parse input .csv and populate dict/lists
+    reader = csv.DictReader(open(dataFile))
+    for row in reader:
+        values = list(row.values())
+        bankDomain = values[3].lower().replace(
+            'http://', '').replace('https://', '').replace('/', '').replace('www.','')
+        bankUrl = 'http://' + \
+            values[3].lower() if not re.search('^https?://', values[3].lower()) else values[3].lower()
+        bankDict[bankDomain] = {
+            "Bank Name": values[1],
+            "Bank URL": bankUrl.rstrip('/'),
+            "Alpha Link": values[4].rstrip('/').replace('http://', '').replace('https://', ''),
+            "Prod Link": values[5].rstrip('/').replace('http://', '').replace('https://', ''),
+        }
+        bankUrls.append(bankUrl)
+        bankDomains.append(bankDomain)
+        bankDomains.append(urlparse(values[4]).netloc)
+        bankDomains.append(urlparse(values[5]).netloc)
+
+    allowed_domains = bankDomains
+    start_urls = bankUrls
 
     # Override default start_requests func to force use of Splash w/ each request
     def start_requests(self):
@@ -67,21 +67,21 @@ class LinksSpider(scrapy.Spider):
         # Search HTML response body from JS content with Splash + parse with BeautifulSoup
         for link in soup.find_all('a', attrs={'href': re.compile("^https?://")}):
             href = link.get('href')
-            if bankDict[curUrlStartDom]['Alpha Link'] in href:
+            if self.bankDict[curUrlStartDom]['Alpha Link'] in href:
                 yield {
-                    'Bank Name': bankDict[curUrlStartDom]['Bank Name'],
+                    'Bank Name': self.bankDict[curUrlStartDom]['Bank Name'],
                     'Response Domain': curResponseDom,
                     'Response Path': curResponsePath,
                     'Link Type': 'Alpha Link',
-                    'Prod/Alpha Link': bankDict[curUrlStartDom]['Alpha Link']
+                    'Prod/Alpha Link': self.bankDict[curUrlStartDom]['Alpha Link']
                 }
-            elif bankDict[curUrlStartDom]['Prod Link'] in href:
+            elif self.bankDict[curUrlStartDom]['Prod Link'] in href:
                 yield {
-                    'Bank Name': bankDict[curUrlStartDom]['Bank Name'],
+                    'Bank Name': self.bankDict[curUrlStartDom]['Bank Name'],
                     'Response Domain': curResponseDom,
                     'Response Path': curResponsePath,
                     'Link Type': 'Production Link',
-                    'Prod/Alpha Link': bankDict[curUrlStartDom]['Prod Link']
+                    'Prod/Alpha Link': self.bankDict[curUrlStartDom]['Prod Link']
                 }
         # Search response directly with xpath
         # Only create new requests from xpath vars b/c Splash raw HTML doesn't
@@ -91,24 +91,24 @@ class LinksSpider(scrapy.Spider):
                 curDomain = urlparse(href).netloc.replace('www.','')
                 curPath = urlparse(href).path.rstrip('/')
                 if curDomain:
-                    if curDomain not in visited2:
-                        visited2[curDomain] = set()
-                    if curPath not in visited2[curDomain]:
-                        visited2[curDomain].add(curPath)
-                        if bankDict[curUrlStartDom]['Alpha Link'] in href:
+                    if curDomain not in self.visited2:
+                        self.visited2[curDomain] = set()
+                    if curPath not in self.visited2[curDomain]:
+                        self.visited2[curDomain].add(curPath)
+                        if self.bankDict[curUrlStartDom]['Alpha Link'] in href:
                             yield {
-                                'Bank Name': bankDict[curUrlStartDom]['Bank Name'],
+                                'Bank Name': self.bankDict[curUrlStartDom]['Bank Name'],
                                 'Response Domain': curResponseDom,
                                 'Response Path': curResponsePath,
                                 'Link Type': 'Alpha Link',
-                                'Prod/Alpha Link': bankDict[curUrlStartDom]['Alpha Link']
+                                'Prod/Alpha Link': self.bankDict[curUrlStartDom]['Alpha Link']
                             }
-                        elif bankDict[curUrlStartDom]['Prod Link'] in href:
+                        elif self.bankDict[curUrlStartDom]['Prod Link'] in href:
                             yield {
-                                'Bank Name': bankDict[curUrlStartDom]['Bank Name'],
+                                'Bank Name': self.bankDict[curUrlStartDom]['Bank Name'],
                                 'Response Domain': curResponseDom,
                                 'Response Path': curResponsePath,
                                 'Link Type': 'Production Link',
-                                'Prod/Alpha Link': bankDict[curUrlStartDom]['Prod Link']
+                                'Prod/Alpha Link': self.bankDict[curUrlStartDom]['Prod Link']
                             }
             yield scrapy.Request(response.urljoin(href), self.parse)

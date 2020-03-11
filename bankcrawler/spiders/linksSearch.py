@@ -15,57 +15,8 @@ load_dotenv(dotenv_path)
 
 pp = pprint.PrettyPrinter(indent=3)
 
-""" dataFile = os.environ['LOCAL_DATA_PATH'] """
-dataFile = './data/icbaBanks.csv'
-targetLinks = './data/targetLinksICBA.csv'
-# Track visited paths to avoid repetitive crawling, domain: set() of paths mapping
-#visitedSplash = {}
-#visited = {}
-# Avoid repeated output due to double scanning of webpages
-output = {}
-# Parsed CSV information
-bankDict = {}
-targetDict = {}
-# Start URLs for Scrapy
-bankUrls = []
-# Allowed Domains to traverse
-bankDomains = []
-
-# Parse input .csv and populate dict/lists
-reader = csv.DictReader(open(dataFile))
-for row in reader:
-    values = list(row.values())
-    bankDomain = values[5].lower().replace(
-        'http://', '').replace('https://', '').replace('/', '').replace('www.','')
-    bankUrl = 'http://' + \
-        values[5].lower() if not re.search('^https?://', values[5].lower()) else values[5].lower()
-    bankDict[bankDomain] = {
-        "Bank Name": values[0],
-    }
-    if bankUrl: bankUrls.append(bankUrl)
-    if bankDomain: bankDomains.append(bankDomain)
-
-# 2nd file parser for list of target links to search for
-reader2 = csv.DictReader(open(targetLinks))
-for row in reader2:
-    values = list(row.values())
-    extracted = tldextract.extract(values[0])
-    linkDomain = "{}.{}".format(extracted.domain, extracted.suffix)
-    if (linkDomain and linkDomain not in bankDomains): bankDomains.append(linkDomain)
-    if (extracted.subdomain): linkDomain = extracted.subdomain + '.' + linkDomain
-    targetDict[linkDomain] = {
-        "Description": values[1]
-    }
-
-#pp.pprint(bankDict)
-#pp.pprint(targetDict)
-#pp.pprint(bankUrls)
-#pp.pprint(bankDomains)
-
 class LinksSpider(scrapy.Spider):
     name = 'linksSearch'
-    allowed_domains = bankDomains
-    start_urls = bankUrls
     custom_settings = {
         'FEED_FORMAT': 'csv',
         'FEED_URI': './csv/{}.csv'.format(name),
@@ -74,6 +25,58 @@ class LinksSpider(scrapy.Spider):
         'LOG_ENABLED': True,
         'LOG_LEVEL': 'INFO'
     }
+
+    # List of banks
+    dataFile = os.environ['LOCAL_DATA_PATH']
+    # List of target links to search for
+    targetLinks = os.environ['LOCAL_SHEET_PATH']
+
+    # Track visited paths to avoid repetitive crawling, domain: set() of paths mapping
+    #visitedSplash = {}
+    #visited = {}
+    # Avoid repeated output due to double scanning of webpages
+    output = {}
+    # Parsed CSV information
+    bankDict = {}
+    targetDict = {}
+    # Start URLs for Scrapy
+    bankUrls = []
+    # Allowed Domains to traverse
+    bankDomains = []
+
+    # Parse input .csv and populate dict/lists
+    reader = csv.DictReader(open(dataFile))
+    for row in reader:
+        values = list(row.values())
+        bankDomain = values[5].lower().replace(
+            'http://', '').replace('https://', '').replace('/', '').replace('www.','')
+        bankUrl = 'http://' + \
+            values[5].lower() if not re.search('^https?://', values[5].lower()) else values[5].lower()
+        bankDict[bankDomain] = {
+            "Bank Name": values[0],
+        }
+        if bankUrl: bankUrls.append(bankUrl)
+        if bankDomain: bankDomains.append(bankDomain)
+
+    # 2nd file parser for list of target links to search for
+    reader2 = csv.DictReader(open(targetLinks))
+    for row in reader2:
+        values = list(row.values())
+        extracted = tldextract.extract(values[0])
+        linkDomain = "{}.{}".format(extracted.domain, extracted.suffix)
+        if (linkDomain and linkDomain not in bankDomains): bankDomains.append(linkDomain)
+        if (extracted.subdomain): linkDomain = extracted.subdomain + '.' + linkDomain
+        targetDict[linkDomain] = {
+            "Description": values[1]
+        }
+
+    allowed_domains = bankDomains
+    start_urls = bankUrls
+
+    #pp.pprint(bankDict)
+    #pp.pprint(targetDict)
+    #pp.pprint(bankUrls)
+    #pp.pprint(bankDomains)
 
     # Override default start_requests func to force use of Splash w/ each request
     def start_requests(self):
@@ -103,14 +106,14 @@ class LinksSpider(scrapy.Spider):
         # Search HTML response body from JS content with Splash + parse with BeautifulSoup
         for link in soup.findAll('a', attrs={'href': re.compile("^https?://")}):
             href = link.get('href').lower()
-            for target in targetDict.keys():
+            for target in self.targetDict.keys():
                 if target in href:
                     yield {
-                        'Bank Name': bankDict[curUrlStartDom]['Bank Name'],
+                        'Bank Name': self.bankDict[curUrlStartDom]['Bank Name'],
                         'Response Domain': curResponseDom.replace('www.',''),
                         'Response Path': curResponsePath,
                         'Found Link': href,
-                        'Description': targetDict[target]['Description']
+                        'Description': self.targetDict[target]['Description']
                     }
                     
                 #curPath = urlparse(href).path.lower().rstrip('/')
