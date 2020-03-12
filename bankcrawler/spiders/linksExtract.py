@@ -15,8 +15,6 @@ load_dotenv(dotenv_path)
 
 class LinksSpider(scrapy.Spider):
     name = 'linksExtract'
-    allowed_domains = bankDomains
-    start_urls = bankUrls
     custom_settings = {
         #'LOG_FILE': './logs/linksExtract.log',
         #'LOG_LEVEL': 'DEBUG',
@@ -49,6 +47,9 @@ class LinksSpider(scrapy.Spider):
         bankDomains.append(bankDomain)
         bankDomains.append(urlparse(values[4]).netloc)
         bankDomains.append(urlparse(values[5]).netloc)
+    
+    allowed_domains = bankDomains
+    start_urls = bankUrls
 
     # Override default start_requests func to force use of Splash w/ each request
     def start_requests(self):
