@@ -28,7 +28,7 @@ USER_AGENT = 'bankcrawler (+' + os.getenv('AGENT_DOMAIN') + ')'
 ROBOTSTXT_OBEY = False
 
 # Configure maximum concurrent requests performed by Scrapy (default: 16)
-CONCURRENT_REQUESTS = 64
+CONCURRENT_REQUESTS = 96
 
 # Configure a delay for requests for the same website (default: 0)
 # See https://docs.scrapy.org/en/latest/topics/settings.html#download-delay
@@ -37,7 +37,7 @@ DOWNLOAD_DELAY = 5
 DOWNLOAD_TIMEOUT = 180
 RANDOMIZE_DOWNLOAD_DELAY = True
 # The download delay setting will honor only one of:
-CONCURRENT_REQUESTS_PER_DOMAIN = 16
+CONCURRENT_REQUESTS_PER_DOMAIN = 6
 # CONCURRENT_REQUESTS_PER_IP = 32
 
 # Disable cookies (enabled by default)
@@ -63,6 +63,8 @@ SPIDER_MIDDLEWARES = {
 # See https://docs.scrapy.org/en/latest/topics/downloader-middleware.html
 DOWNLOADER_MIDDLEWARES = {
 #    'scrapy_selenium.SeleniumMiddleware': 800
+#    'scrapy.downloadermiddlewares.useragent.UserAgentMiddleware': None,
+#    'scrapy_user_agents.middlewares.RandomUserAgentMiddleware': 400,
     'scrapy_splash.SplashCookiesMiddleware': 723,
     'scrapy_splash.SplashMiddleware': 725,
     'scrapy.downloadermiddlewares.httpcompression.HttpCompressionMiddleware': 810,
@@ -79,6 +81,9 @@ DOWNLOADER_MIDDLEWARES = {
 #ITEM_PIPELINES = {
 #    'bankcrawler.pipelines.BankcrawlerPipeline': 300,
 #}
+
+# Number of times to retry a request
+RETRY_TIMES = 1
 
 # Enable and configure the AutoThrottle extension (disabled by default)
 # See https://docs.scrapy.org/en/latest/topics/autothrottle.html
