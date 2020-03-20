@@ -51,6 +51,9 @@ class LinksSpider(scrapy.Spider):
     allowed_domains = bankDomains
     start_urls = bankUrls
 
+    allowed_domains = bankDomains
+    start_urls = bankUrls
+
     # Override default start_requests func to force use of Splash w/ each request
     def start_requests(self):
         for url in self.start_urls:
