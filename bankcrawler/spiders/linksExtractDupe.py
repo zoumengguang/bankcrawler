@@ -21,7 +21,7 @@ class LinksSpider(scrapy.Spider):
         'DEPTH_LIMIT': 4
     }
 
-    dataFile = os.environ['LOCAL_DATA_PATH']
+    dataFile = os.environ['LOCAL_DATA_PATH_BBOW']
     visited = {}
     visited2 = {}
     bankDict = {}

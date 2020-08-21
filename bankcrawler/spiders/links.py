@@ -18,7 +18,7 @@ class LinksSpider(scrapy.Spider):
         'FEED_EXPORT_FIELDS': ["FDIC Cert", "Bank Domain", "Link Type", "Link Domain", "Link Path", "Link Status Response"]
     }
 
-    dataFile = os.environ['LOCAL_DATA_PATH']
+    dataFile = os.environ['LOCAL_DATA_PATH_BBOW']
     visited = {}
     bankDict = {}
     bankUrls = []

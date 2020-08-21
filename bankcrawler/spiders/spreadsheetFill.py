@@ -8,7 +8,7 @@ class LinksSpider(scrapy.Spider):
     name = 'spreadsheetFill'
     custom_settings = {'DEPTH_LIMIT': 3}
 
-    dataFile = os.environ['LOCAL_DATA_PATH']
+    dataFile = os.environ['LOCAL_DATA_PATH_BBOW']
     bankFile = os.environ['LOCAL_SHEET_PATH']
 
     visited = {}

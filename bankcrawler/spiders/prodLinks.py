@@ -27,11 +27,11 @@ class ProdLinksSpider(scrapy.Spider):
         'FEED_FORMAT': 'csv',
         'FEED_URI': './csv/{}.csv'.format(name),
         'DEPTH_LIMIT': 10,
-        'LOG_ENABLED': False,
+        #'LOG_ENABLED': False,
         #'LOG_LEVEL': 'INFO'
     }
 
-    dataFile = os.environ['LOCAL_DATA_PATH']
+    dataFile = os.environ['LOCAL_DATA_PATH_BBOW']
     visited = {}
     bankDict = {}
     bankUrls = []
@@ -65,9 +65,9 @@ class ProdLinksSpider(scrapy.Spider):
         bankDomains.append(alphaLink)
         bankDomains.append(prodLink)
 
-    #pp.pprint(bankDict)
-    #pp.pprint(bankUrls)
-    #pp.pprint(bankDomains)
+    pp.pprint(bankDict)
+    pp.pprint(bankUrls)
+    pp.pprint(bankDomains)
 
     allowed_domains = bankDomains
     start_urls = bankUrls
@@ -105,7 +105,7 @@ class ProdLinksSpider(scrapy.Spider):
         for link in soup.findAll('a', attrs={'onclick': re.compile("https?://")}):
             onclick = link.get('onclick').lower()
 
-            if alpha_link in onclick:
+            if alpha_link and alpha_link in onclick:
                 yield {
                     'Bank Name': self.bankDict[curBankDomain]['Bank Name'],
                     'Bank Domain': curBankDomain,
@@ -113,7 +113,7 @@ class ProdLinksSpider(scrapy.Spider):
                     'Found Link Path': curResponsePath,
                     'Link(Alpha/Prod)': self.bankDict[curBankDomain]['Alpha Link']
                 }
-            elif prod_link in onclick:
+            elif prod_link and prod_link in onclick:
                 yield {
                     'Bank Name': self.bankDict[curBankDomain]['Bank Name'],
                     'Bank Domain': curBankDomain,
@@ -127,7 +127,7 @@ class ProdLinksSpider(scrapy.Spider):
         for link in soup.findAll('a', attrs={'href': re.compile(".*")}):
             href = link.get('href').lower()
 
-            if alpha_link in href:
+            if alpha_link and alpha_link in href:
                 yield {
                     'Bank Name': self.bankDict[curBankDomain]['Bank Name'],
                     'Bank Domain': curBankDomain,
@@ -135,7 +135,7 @@ class ProdLinksSpider(scrapy.Spider):
                     'Found Link Path': curResponsePath,
                     'Link(Alpha/Prod)': self.bankDict[curBankDomain]['Alpha Link']
                 }
-            elif prod_link in href:
+            elif prod_link and prod_link in href:
                 yield {
                     'Bank Name': self.bankDict[curBankDomain]['Bank Name'],
                     'Bank Domain': curBankDomain,

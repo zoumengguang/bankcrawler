@@ -27,7 +27,7 @@ class LinksSpider(scrapy.Spider):
     }
 
     # List of banks
-    dataFile = os.environ['LOCAL_DATA_PATH']
+    dataFile = os.environ['LOCAL_DATA_PATH_BBOW']
     # List of target links to search for
     targetLinks = os.environ['LOCAL_SHEET_PATH']
 

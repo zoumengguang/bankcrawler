@@ -3,18 +3,12 @@
 # whether or not the link was found on the site.
 # Spider takes input as .csv formatted in the exact way in specified in the file:
 # ID Number | Bank Name | Address | Bank Website | Alpha Link | Production Link 
-#
-# TODO: Crawling only affects first page, see stackoverflow 
-#
+
 import scrapy
 import os
 import csv
-import json
 import re
 import tldextract
-from scrapy.http.headers import Headers
-from scrapy.spiders import CrawlSpider, Rule
-from scrapy.linkextractors import LinkExtractor
 from os.path import join, dirname
 from dotenv import load_dotenv
 from urllib.parse import urlparse
@@ -26,8 +20,8 @@ pp = pprint.PrettyPrinter(indent=3)
 dotenv_path = join(dirname(__file__), '../.env')
 load_dotenv(dotenv_path)
 
-class ProdLinksSpider(CrawlSpider):
-    name = 'prodLinksNew'
+class ProdLinksSpider(scrapy.Spider):
+    name = 'prodLinksUBB'
     custom_settings = {
         #'FEED_EXPORT_FIELDS': ["Bank Name", "Bank Domain", "Link Domain", "Link Path", "Link Type"]
         'FEED_FORMAT': 'csv',
@@ -37,13 +31,15 @@ class ProdLinksSpider(CrawlSpider):
         #'LOG_LEVEL': 'INFO'
     }
 
-    dataFile = os.environ['LOCAL_DATA_PATH_BBOW']
+    dataFile = os.environ['LOCAL_DATA_PATH_UBB']
+    visited = {}
     bankDict = {}
     bankUrls = []
     bankDomains = []
-    blacklist = ['tel:', 'mailto:', '#', 'javascript:']
 
     # Parse .csv and populate dict/lists
+    # visited - Dictionary of set objects with domain: path entries 
+    #   for tracking visited paths on a specified domain
     # Bank Dict - Main information store for each bank
     # Bank Urls - List of starting URLs for spider to crawl
     # Bank Domains - List of allowed domains spider can visit
@@ -61,29 +57,23 @@ class ProdLinksSpider(CrawlSpider):
         bankDict[bankDomain] = {
             "Bank Name": values[1],
             "Bank URL": bankUrl.rstrip('/'),
-            "Alpha Link": alphaLink,
             "Prod Link": prodLink,
         }
         if bankUrl: bankUrls.append(bankUrl)
         if bankDomain: bankDomains.append(bankDomain)
-        bankDomains.append(alphaLink)
-        bankDomains.append(prodLink)
+        if alphaLink: bankDomains.append(alphaLink)
+        if prodLink: bankDomains.append(prodLink)
 
-    #pp.pprint(bankDict)
-    #pp.pprint(bankUrls)
-    #pp.pprint(bankDomains)
+    pp.pprint(bankDict)
+    pp.pprint(bankUrls)
+    pp.pprint(bankDomains)
 
     allowed_domains = bankDomains
     start_urls = bankUrls
 
-    rules = [
-        Rule(LinkExtractor(restrict_xpaths='//a/@href'), follow=True, callback='parse_item')
-    ]
-
-    # Override built-in start_requests to use Splash
     def start_requests(self):
         for url in self.start_urls:
-            yield scrapy.Request(url, self.parse_item, meta={
+            yield scrapy.Request(url, self.parse, meta={
                 'splash': {
                     'args': {
                         'timeout': 90, 
@@ -98,7 +88,7 @@ class ProdLinksSpider(CrawlSpider):
     # print(response.status) HTTP status code
     # print(response.request.meta.get('redirect_urls')) get all followed redirect urls to get to current path
     # print(response.meta['start_url']) custom middleware to get originating start_url of current url
-    def parse_item(self, response):
+    def parse(self, response):
         # Get originating domain of current request
         curBankDomain = response.meta['start_url'].lower().replace(
             'http://', '').replace('https://', '').replace('/', '').replace('www.','')
@@ -107,26 +97,13 @@ class ProdLinksSpider(CrawlSpider):
         if (extracted.subdomain): curResponseDom = extracted.subdomain + '.' + curResponseDom
         curResponsePath = urlparse(response.url).path.rstrip('/')
         soup = BeautifulSoup(response.body, features='lxml')
-        alpha_link = self.bankDict[curBankDomain]['Alpha Link']
         prod_link = self.bankDict[curBankDomain]['Prod Link']
-
-        #print(curBankDomain)
-        #print(curResponseDom)
-        #print(curResponsePath)
-        #print(self.bankDict[curBankDomain])
 
         # Edge case for certain sites putting links inside the onclick as a var to be passed in jQuery
         for link in soup.findAll('a', attrs={'onclick': re.compile("https?://")}):
             onclick = link.get('onclick').lower()
-            if alpha_link in onclick:
-                yield {
-                    'Bank Name': self.bankDict[curBankDomain]['Bank Name'],
-                    'Bank Domain': curBankDomain,
-                    'Found Link Domain': curResponseDom,
-                    'Found Link Path': curResponsePath,
-                    'Link(Alpha/Prod)': self.bankDict[curBankDomain]['Alpha Link']
-                }
-            elif prod_link in onclick:
+
+            if prod_link and prod_link in onclick:
                 yield {
                     'Bank Name': self.bankDict[curBankDomain]['Bank Name'],
                     'Bank Domain': curBankDomain,
@@ -139,15 +116,8 @@ class ProdLinksSpider(CrawlSpider):
         # HTML response from Splash includes JS rendered content, whereas regular scrapy response does not
         for link in soup.findAll('a', attrs={'href': re.compile(".*")}):
             href = link.get('href').lower()
-            if alpha_link in href:
-                yield {
-                    'Bank Name': self.bankDict[curBankDomain]['Bank Name'],
-                    'Bank Domain': curBankDomain,
-                    'Found Link Domain': curResponseDom,
-                    'Found Link Path': curResponsePath,
-                    'Link(Alpha/Prod)': self.bankDict[curBankDomain]['Alpha Link']
-                }
-            elif prod_link in href:
+
+            if prod_link and prod_link in href:
                 yield {
                     'Bank Name': self.bankDict[curBankDomain]['Bank Name'],
                     'Bank Domain': curBankDomain,
@@ -155,33 +125,27 @@ class ProdLinksSpider(CrawlSpider):
                     'Found Link Path': curResponsePath,
                     'Link(Alpha/Prod)': self.bankDict[curBankDomain]['Prod Link']
                 }
-            check = any(word in href for word in self.blacklist)
-            print(href)
-            if not check:
-                yield scrapy.Request(response.urljoin(href), self.parse_item, meta={
-                    'splash': {
-                        'args': {
-                            'timeout': 90, 
-                            'wait': 0.5,
-                            'resource_timeout': 60 
-                        },
-                        'endpoint': 'render.html'
-                    }
-                })
+            yield response.follow(href, callback=self.parse, meta={
+                'splash': {
+                    'args': {
+                        'timeout': 90, 
+                        'wait': 0.5,
+                        'resource_timeout': 60 
+                    },
+                    'endpoint': 'render.html'
+                }
+            })
 
         # Scrapy response and splash response contain differing hrefs on the page? Must follow both
         # even if redundant
         for href in response.xpath('//a/@href').getall():
-            print(href)
-            check = any(word in href for word in self.blacklist)
-            if not check:
-                yield scrapy.Request(response.urljoin(href), self.parse_item, meta={
-                    'splash': {
-                        'args': {
-                            'timeout': 90, 
-                            'wait': 0.5,
-                            'resource_timeout': 60 
-                        },
-                        'endpoint': 'render.html'
-                    }
-                })
+            yield response.follow(href, callback=self.parse, meta={
+                'splash': {
+                    'args': {
+                        'timeout': 90, 
+                        'wait': 0.5,
+                        'resource_timeout': 60 
+                    },
+                    'endpoint': 'render.html'
+                }
+            })
